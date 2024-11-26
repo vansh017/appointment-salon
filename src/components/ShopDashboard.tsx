@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Users, Scissors, Settings, Plus, X } from 'lucide-react';
+import { Clock, Users, Scissors, Settings, Plus, X, Check } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import ShopSettingsModal from './ShopSettingsModal';
 
 interface Service {
   id: string;
@@ -42,44 +43,63 @@ const ShopDashboard = () => {
   const [isAddShopModalOpen, setIsAddShopModalOpen] = useState(false);
   const [queueData, setQueueData] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [servicesCount, setServicesCount] = useState(0);
 
-  useEffect(() => {
-    const fetchShopData = async () => {
-      try {
-        if (!user?.id) return;
-        
-        const response = await fetch(`http://localhost:8000/shops/owner/${user.id}`, {
+  const fetchShopData = async () => {
+    try {
+      if (!user?.id) return;
+      
+      const response = await fetch(`http://localhost:8000/shops/owner/${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${user.token}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch shops');
+      
+      const data = await response.json();
+      setShops(data.shops);
+      
+      // If there are shops, fetch queue for the first shop
+      if (data.shops.length > 0) {
+        const queueResponse = await fetch(`http://localhost:8000/shops/${data.shops[0].id}/queue`, {
           headers: {
-            'Authorization': `Bearer ${user.id}`
+            'Authorization': `Bearer ${user.token}`
           }
         });
         
-        if (!response.ok) throw new Error('Failed to fetch shops');
+        if (!queueResponse.ok) throw new Error('Failed to fetch queue');
         
-        const data = await response.json();
-        setShops(data.shops);
-        
-        // If there are shops, fetch queue for the first shop
-        if (data.shops.length > 0) {
-          const queueResponse = await fetch(`http://localhost:8000/shops/${data.shops[0].id}/queue`, {
-            headers: {
-              'Authorization': `Bearer ${user.id}`
-            }
-          });
-          
-          if (!queueResponse.ok) throw new Error('Failed to fetch queue');
-          
-          const queueData = await queueResponse.json();
-          setQueueData(queueData.queue);
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
+        const queueData = await queueResponse.json();
+        setQueueData(queueData.queue);
       }
-    };
 
+      const servicesResponse = await fetch(
+        `http://localhost:8000/shops/${data.shops[0].id}/services-today`,
+        {
+          headers: {
+            'Authorization': `Bearer ${user?.token}`
+          }
+        }
+      );
+
+      if (servicesResponse.ok) {
+        const servicesData = await servicesResponse.json();
+        setServicesCount(servicesData.count);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchShopData();
+    // Set up auto-refresh interval
+    const intervalId = setInterval(fetchShopData, 5000); // Refresh every 5 seconds
+
+    return () => clearInterval(intervalId); // Cleanup on unmount
   }, [user]);
 
   const calculateAverageWaitTime = (queue: QueueItem[]): number => {
@@ -95,6 +115,29 @@ const ShopDashboard = () => {
     });
     
     return Math.ceil(totalDuration / queue.length);
+  };
+
+  const handleCompleteService = async (queueId: string) => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/shops/${shops[0].id}/queue/${queueId}/complete`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${user?.token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to complete service');
+      }
+
+      // Refresh the queue data
+      fetchShopData();
+    } catch (error) {
+      console.error('Error completing service:', error);
+    }
   };
 
   if (loading) {
@@ -173,7 +216,7 @@ const ShopDashboard = () => {
             </h3>
           </div>
           <p className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-            12
+            {servicesCount}
           </p>
         </div>
       </div>
@@ -201,13 +244,22 @@ const ShopDashboard = () => {
                     {appointment.service} - {appointment.time}
                   </p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  appointment.status === 'in-progress'
-                    ? 'bg-blue-100 text-blue-800'
-                    : isDarkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {appointment.status === 'in-progress' ? 'In Progress' : 'Waiting'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    appointment.status === 'in-progress'
+                      ? 'bg-blue-100 text-blue-800'
+                      : isDarkMode ? 'bg-gray-600 text-gray-200' : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {appointment.status === 'in-progress' ? 'In Progress' : 'Waiting'}
+                  </span>
+                  <button
+                    onClick={() => handleCompleteService(appointment.id)}
+                    className="p-2 rounded-full hover:bg-green-100 text-green-600 transition-colors"
+                    title="Mark as completed"
+                  >
+                    <Check className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -253,7 +305,7 @@ const AddShopModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user?.id}`
+          'Authorization': `Bearer ${user?.token}`
         },
         body: JSON.stringify(formData)
       });

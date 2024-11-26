@@ -69,25 +69,34 @@ const ShopSettingsModal = ({ isOpen, onClose, shop }: ShopSettingsModalProps) =>
     setError(null);
     setIsSubmitting(true);
     
+    const formattedData = {
+      ...formData,
+      services: formData.services.map(service => ({
+        service_id: service.service_id,
+        price: Number(service.price),
+        duration: Number(service.duration)
+      }))
+    };
+    
     try {
       const response = await fetch(`http://localhost:8000/shops/${shop.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user?.id}`
+          'Authorization': `Bearer ${user?.token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formattedData)
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update shop');
+        const errorData = await response.json();  
+        throw new Error(errorData.detail || 'Failed to update shop');
       }
 
       onClose();
       window.location.reload();
-    } catch (error) {
-      setError(error.message);
+    } catch (error: any) {
+      setError(error instanceof Error ? error.message : 'Failed to update shop');
       console.error('Error updating shop:', error);
     } finally {
       setIsSubmitting(false);

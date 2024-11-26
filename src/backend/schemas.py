@@ -8,3 +8,7 @@ class ShopUpdate(BaseModel):
     address: str
     description: str
     services: List[ShopServiceUpdate] 
+
+class QueueCreate(BaseModel):
+    customer_name: str
+    service_ids: List[str] 

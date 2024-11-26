@@ -39,10 +39,19 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Authentication failed');
+        throw new Error(data.detail || 'Authentication failed');
       }
 
-      login(data.user);
+      const userData = {
+        id: data.id,
+        name: data.name || `${data.first_name} ${data.last_name}`.trim(),
+        email: data.email,
+        role: data.role || 'customer',
+        token: data.token,
+        dark_mode: data.dark_mode
+      };
+
+      login(userData);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');

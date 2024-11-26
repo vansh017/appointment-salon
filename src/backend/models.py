@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
 import enum
+from datetime import datetime
 
 class User(Base):
     __tablename__ = "users"
@@ -17,6 +18,7 @@ class User(Base):
     
     # Add relationship to shops
     shops = relationship("Shop", back_populates="owner")
+    tokens = relationship("Token", back_populates="user")
 
 class Shop(Base):
     __tablename__ = "shops"
@@ -67,6 +69,33 @@ class Queue(Base):
     status = Column(String(50), default='waiting')  # waiting, in-progress, completed
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    shop = relationship("Shop")
+    service = relationship("Service")
+
+class Token(Base):
+    __tablename__ = "tokens"
+    
+    id = Column(String(36), primary_key=True)
+    user_id = Column(String(36), ForeignKey('users.id'))
+    token = Column(String(500), nullable=False)  # JWT tokens can be long
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    
+    user = relationship("User", back_populates="tokens")
+
+class ServiceHistory(Base):
+    __tablename__ = "service_history"
+
+    id = Column(String(36), primary_key=True)
+    shop_id = Column(String(36), ForeignKey('shops.id'))
+    customer_name = Column(String(255), nullable=False)
+    service_id = Column(String(36), ForeignKey('services.id'))
+    completed_at = Column(DateTime(timezone=True), nullable=False)
+    duration = Column(Integer)  # actual duration in minutes
+    price = Column(Float, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     shop = relationship("Shop")
     service = relationship("Service")
