@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global transition for all elements */
+* {
+  transition: all 0.3s ease;
+}
+
+body {
+  transition: background 0.5s ease, color 0.5s ease;
+}
+
+.light-mode {
+  background: rgb(128, 192, 255);
+  background: radial-gradient(circle, rgba(128, 192, 255, 1) 51%, rgba(0, 0, 255, 1) 100%);
+}
+
+.dark-mode {
+  background: rgb(2, 0, 36);
+  background: radial-gradient(circle, rgba(2, 0, 36, 1) 51%, rgba(9, 9, 121, 1) 100%);
+}
